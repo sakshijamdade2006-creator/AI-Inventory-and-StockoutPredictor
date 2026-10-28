@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Inventory & Stockout Predictor</title>
+<style>
+*{box-sizing:border-box}
+:root{--navy:#152746;--blue:#2563eb;--blue2:#dce9ff;--bg:#f3f6fb;--ink:#18263d;--muted:#6b7890;--line:#e1e7f0;--green:#16845b;--orange:#b96a08;--red:#c73535}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,system-ui,sans-serif}
+header{background:linear-gradient(120deg,#142746,#2463c9);color:#fff;padding:27px 5%}
+.wrap{max-width:1180px;margin:auto}
+.brand{font-size:28px;font-weight:800;letter-spacing:-.4px}
+.brand small{display:block;font-size:13px;font-weight:400;color:#d8e5ff;margin-top:7px;letter-spacing:0}
+main{max-width:1180px;margin:23px auto;padding:0 16px}
+.intro,.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:17px;box-shadow:0 5px 18px #1b2c4b08}
+.intro{background:#eaf1ff;border-color:#d6e4ff}
+.intro h2{margin:0 0 8px;font-size:21px}.intro p{margin:0;line-height:1.6;color:#465b7b}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card h3{margin:0 0 5px;font-size:17px}.sub{font-size:13px;color:var(--muted);margin:0 0 17px;line-height:1.5}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:17px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px;box-shadow:0 5px 18px #1b2c4b08}
+.stat .label{font-size:12px;color:var(--muted);font-weight:700}.stat .num{font-size:27px;font-weight:800;margin-top:9px}.stat .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:minmax(300px,.85fr) minmax(0,1.6fr);gap:17px;align-items:start}
+label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+input,select{width:100%;padding:10px 11px;border:1px solid #d4ddea;border-radius:9px;font:inherit;font-size:13px;margin-bottom:13px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid #b9d1ff;border-color:#7ba6ff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:9px;padding:10px 13px;font-weight:700;font-size:12px;cursor:pointer}
+.primary{background:var(--blue);color:white}.secondary{background:var(--blue2);color:#1746a2}.plain{background:#edf1f7;color:#34445e}.danger{background:#fff0f0;color:#a72828}
+.buttons{display:flex;gap:8px;flex-wrap:wrap}.note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:12px}
+.table-wrap{overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:12px}
+th{text-align:left;color:#6b7890;background:#f7f9fc;font-size:11px;letter-spacing:.2px}
+th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:hover{background:#fafcff}
+.product-name{font-weight:700}.sku{font-size:11px;color:var(--muted);margin-top:3px}
+.pill{display:inline-block;padding:5px 8px;border-radius:30px;font-size:10px;font-weight:800;white-space:nowrap}
+.ok{background:#e4f8ee;color:#13754e}.warn{background:#fff2d9;color:#9a5a05}.risk{background:#ffe5e5;color:#ad2525}.neutral{background:#edf1f7;color:#4b5b73}
+.toolbar{display:grid;grid-template-columns:1fr 170px;gap:10px}
+.toolbar input,.toolbar select{margin-bottom:0}
+.insights{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.insight{padding:13px;border:1px solid var(--line);border-radius:12px;background:#fbfcff}
+.insight b{display:block;font-size:13px;margin-bottom:5px}.insight p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.empty{text-align:center;padding:25px;color:var(--muted);font-size:13px}
+footer{text-align:center;padding:20px;color:var(--muted);font-size:11px}
+.toast{display:none;margin:10px 0;padding:10px 12px;border-radius:9px;background:#e5f8ed;color:#146642;font-size:12px}.toast.show{display:block}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){header{padding:22px 5%}.brand{font-size:23px}.stats{gap:9px}.stat{padding:13px}.stat .num{font-size:23px}.row,.insights{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap brand">📦 AI Inventory & Stockout Predictor<small>Smart stock monitoring, demand estimation and reorder recommendations</small></div></header>
+<main>
+<section class="intro">
+<h2>Know what to reorder before it runs out.</h2>
+<p>Add your products and sales information to estimate how long stock will last, identify stockout risks, and plan your next order. This project demo runs in your browser and saves inventory data on this device.</p>
+</section>
+<section class="stats">
+<div class="stat"><div class="label">TOTAL PRODUCTS</div><div class="num" id="totalProducts">0</div><div class="hint">Products being tracked</div></div>
+<div class="stat"><div class="label">LOW STOCK</div><div class="num" id="lowStock">0</div><div class="hint">At or below reorder level</div></div>
+<div class="stat"><div class="label">STOCKOUT RISK</div><div class="num" id="riskCount">0</div><div class="hint">May run out before delivery</div></div>
+<div class="stat"><div class="label">INVENTORY VALUE</div><div class="num" id="inventoryValue">₹0</div><div class="hint">Current stock × unit cost</div></div>
+</section>
+<div class="grid">
+<section class="card">
+<h3 id="formHeading">➕ Add a Product</h3>
+<p class="sub">Enter product details and recent sales information.</p>
+<form id="productForm">
+<input type="hidden" id="editId">
+<label for="productName">Product name *</label><input id="productName" required maxlength="80" placeholder="e.g. A4 Notebook">
+<div class="row"><div><label for="sku">Product code / SKU</label><input id="sku" placeholder="e.g. NOTE-001"></div><div><label for="category">Category</label><select id="category"><option>General</option><option>Grocery</option><option>Stationery</option><option>Electronics</option><option>Clothing</option><option>Home</option><option>Personal Care</option><option>Other</option></select></div></div>
+<div class="row"><div><label for="stock">Current stock (units) *</label><input id="stock" type="number" min="0" step="1" required value="40"></div><div><label for="dailySales">Average daily sales *</label><input id="dailySales" type="number" min="0" step="0.1" required value="4"></div></div>
+<div class="row"><div><label for="leadTime">Supplier lead time (days) *</label><input id="leadTime" type="number" min="1" step="1" required value="5"></div><div><label for="safetyStock">Safety stock (units) *</label><input id="safetyStock" type="number" min="0" step="1" required value="10"></div></div>
+<div class="row"><div><label for="unitCost">Unit cost (₹)</label><input id="unitCost" type="number" min="0" step="0.01" value="50"></div><div><label for="supplier">Supplier name</label><input id="supplier" maxlength="80" placeholder="e.g. ABC Traders"></div></div>
+<div class="buttons"><button class="btn primary" type="submit" id="saveButton">Save Product</button><button class="btn plain" type="button" id="sampleButton">Load Sample Data</button><button class="btn plain" type="reset" id="resetButton">Clear Form</button></div>
+<div class="note">* Required fields. Use average units sold per day and realistic supplier delivery time for better estimates.</div>
+<div id="toast" class="toast" role="status"></div>
+</form>
+</section>
+<div>
+<section class="card">
+<div class="section-title"><h3>📋 Inventory Overview</h3><div class="buttons"><button class="btn secondary" id="exportButton">Export CSV</button><button class="btn plain" id="resetDemoButton">Reset Demo</button></div></div>
+<p class="sub">Search products and sort by stockout risk or stock level.</p>
+<div class="toolbar"><input id="search" placeholder="Search product, SKU or supplier..."><select id="filter"><option value="all">All products</option><option value="risk">Stockout risk</option><option value="low">Low stock</option><option value="healthy">Healthy stock</option></select></div>
+<div class="table-wrap" style="margin-top:13px"><table><thead><tr><th>PRODUCT</th><th>STOCK</th><th>DAYS LEFT</th><th>REORDER AT</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="inventoryBody"></tbody></table><div id="empty" class="empty">No products yet. Add a product or load sample data.</div></div>
+</section>
+<section class="card">
+<h3>🤖 AI Stock Insights</h3><p class="sub">Automatic recommendations based on the inventory figures you entered.</p>
+<div id="insights" class="insights"><div class="insight"><b>Waiting for inventory</b><p>Add products to see stock insights and reorder suggestions.</p></div></div>
+</section>
+<section class="card">
+<h3>How the predictor works</h3><p class="sub">This prototype uses transparent calculations so you can explain it in a college project demonstration.</p>
+<div class="insights">
+<div class="insight"><b>1. Estimated days left</b><p>Current stock ÷ average daily sales. If daily sales are zero, the estimate is shown as unavailable.</p></div>
+<div class="insight"><b>2. Reorder point</b><p>(Average daily sales × supplier lead time) + safety stock.</p></div>
+<div class="insight"><b>3. Risk detection</b><p>If stock is at or below the reorder point, the item is flagged for reordering. If estimated days left is less than supplier lead time, it is marked as stockout risk.</p></div>
+<div class="insight"><b>4. Suggested order</b><p>Suggests enough units to cover lead-time demand plus safety stock, minus current stock. Check supplier pack sizes and business needs before ordering.</p></div>
+</div>
+<p class="note">Important: this version is an educational prototype, not a trained machine-learning model. It does not use live sales data or a cloud AI service. Forecast accuracy depends on the numbers entered. Data is saved in this browser only.</p>
+</section>
+</div>
+</div>
+</main>
+<footer>AI Inventory & Stockout Predictor · Student project prototype · Data stays in this browser</footer>
+<script>
+const $ = id => document.getElementById(id);
+const STORAGE_KEY = 'aiInventoryPredictorProductsV1';
+let products = [];
+try { products = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); if (!Array.isArray(products)) products = []; } catch(e) { products = []; }
+const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n || 0);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function metrics(p){
+  const daily = Number(p.dailySales)||0, stock = Number(p.stock)||0, lead = Number(p.leadTime)||1, safety = Number(p.safetyStock)||0;
+  const reorder = Math.ceil(daily*lead+safety);
+  const days = daily>0 ? stock/daily : Infinity;
+  const risk = daily>0 && days<lead;
+  const low = stock<=reorder;
+  const suggested = Math.max(0, Math.ceil(daily*(lead+7)+safety-stock));
+  return {reorder,days,risk,low,suggested};
+}
+function status(m){
+  if(m.risk) return '<span class="pill risk">Stockout risk</span>';
+  if(m.low) return '<span class="pill warn">Reorder soon</span>';
+  return '<span class="pill ok">Healthy</span>';
+}
+function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(products));}catch(e){} render();}
+function render(){
+  const enriched=products.map(p=>({p,m:metrics(p)}));
+  $('totalProducts').textContent=products.length;
+  $('lowStock').textContent=enriched.filter(x=>x.m.low).length;
+  $('riskCount').textContent=enriched.filter(x=>x.m.risk).length;
+  $('inventoryValue').textContent=money(products.reduce((sum,p)=>sum+(Number(p.stock)||0)*(Number(p.unitCost)||0),0));
+  const q=$('search').value.trim().toLowerCase(), filter=$('filter').value;
+  const filtered=enriched.filter(({p,m})=>{
+    const matches=[p.name,p.sku,p.supplier,p.category].join(' ').toLowerCase().includes(q);
+    const matchFilter=filter==='all'||(filter==='risk'&&m.risk)||(filter==='low'&&m.low)||(filter==='healthy'&&!m.low);
+    return matches&&matchFilter;
+  }).sort((a,b)=>Number(b.m.risk)-Number(a.m.risk)||Number(b.m.low)-Number(a.m.low)||a.m.days-b.m.days);
+  $('inventoryBody').innerHTML=filtered.map(({p,m})=>`<tr>
+  <td><div class="product-name">${esc(p.name)}</div><div class="sku">${esc(p.sku||'No SKU')} · ${esc(p.category||'General')}</div></td>
+  <td><b>${Number(p.stock)}</b> units</td>
+  <td>${Number.isFinite(m.days)?m.days.toFixed(1)+' days':'—'}</td>
+  <td>${m.reorder} units</td><td>${status(m)}</td>
+  <td><div class="buttons"><button class="btn secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td>
+  </tr>`).join('');
+  $('empty').style.display=filtered.length?'none':'block';
+  renderInsights(enriched);
+}
+function renderInsights(items){
+  const risks=items.filter(x=>x.m.risk).sort((a,b)=>a.m.days-b.m.days);
+  const lows=items.filter(x=>x.m.low&&!x.m.risk).sort((a,b)=>a.m.days-b.m.days);
+  const slow=items.filter(x=>Number(x.p.dailySales)===0&&Number(x.p.stock)>0);
+  let cards=[];
+  if(!items.length){cards.push(['Waiting for inventory','Add a product or load sample data to generate recommendations.']);}
+  else if(risks.length){cards.push(['🚨 Prioritise these products',risks.slice(0,3).map(x=>`${x.p.name}: about ${x.m.days.toFixed(1)} days of stock left; supplier lead time is ${x.p.leadTime} days.`).join(' ')]);}
+  if(lows.length){cards.push(['📦 Reorder soon',lows.slice(0,3).map(x=>`${x.p.name}: reorder point is ${x.m.reorder} units; suggested order is ${x.m.suggested} units.`).join(' ')]);}
+  if(slow.length){cards.push(['🔎 Review slow-moving stock',slow.slice(0,3).map(x=>`${x.p.name} has stock but no average daily sales entered. Check whether demand data is correct.`).join(' ')]);}
+  if(items.length&&!risks.length&&!lows.length&&!slow.length){cards.push(['✅ Stock looks healthy','No products currently meet the low-stock or stockout-risk rules. Continue updating stock and sales figures.']);}
+  $('insights').innerHTML=cards.map(c=>`<div class="insight"><b>${esc(c[0])}</b><p>${esc(c[1])}</p></div>`).join('');
+}
+function showToast(message){$('toast').textContent=message;$('toast').classList.add('show');}
+function resetForm(){ $('productForm').reset(); $('editId').value=''; $('formHeading').textContent='➕ Add a Product'; $('saveButton').textContent='Save Product'; $('stock').value=40; $('dailySales').value=4; $('leadTime').value=5; $('safetyStock').value=10; $('unitCost').value=50; }
+$('productForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const id=$('editId').value||('p_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
+  const item={id,name:$('productName').value.trim(),sku:$('sku').value.trim(),category:$('category').value,stock:Number($('stock').value),dailySales:Number($('dailySales').value),leadTime:Number($('leadTime').value),safetyStock:Number($('safetyStock').value),unitCost:Number($('unitCost').value)||0,supplier:$('supplier').value.trim()};
+  if(!item.name){return;}
+  const index=products.findIndex(p=>p.id===id);
+  if(index>=0) products[index]=item; else products.unshift(item);
+  save();resetForm();showToast(index>=0?'Product updated successfully.':'Product added successfully.');
+});
+$('resetButton').addEventListener('click',()=>{setTimeout(()=>{resetForm();$('toast').classList.remove('show');},0);});
+window.editProduct=id=>{
+  const p=products.find(x=>x.id===id);if(!p)return;
+  $('editId').value=p.id;$('productName').value=p.name;$('sku').value=p.sku||'';$('category').value=p.category||'General';$('stock').value=p.stock;$('dailySales').value=p.dailySales;$('leadTime').value=p.leadTime;$('safetyStock').value=p.safetyStock;$('unitCost').value=p.unitCost||0;$('supplier').value=p.supplier||'';
+  $('formHeading').textContent='✏️ Edit Product';$('saveButton').textContent='Update Product';window.scrollTo({top:0,behavior:'smooth'});
+};
+window.deleteProduct=id=>{
+  const p=products.find(x=>x.id===id);if(!p)return;
+  if(confirm(`Delete "${p.name}" from inventory?`)){products=products.filter(x=>x.id!==id);save();showToast('Product deleted.');}
+};
+$('sampleButton').addEventListener('click',()=>{
+  const samples=[
+    {name:'A4 Notebook',sku:'NOTE-001',category:'Stationery',stock:18,dailySales:5,leadTime:5,safetyStock:10,unitCost:35,supplier:'ABC Paper Traders'},
+    {name:'Packaged Rice 5kg',sku:'GROC-014',category:'Grocery',stock:22,dailySales:6,leadTime:4,safetyStock:12,unitCost:280,supplier:'FreshMart Wholesale'},
+    {name:'USB-C Cable',sku:'ELEC-021',category:'Electronics',stock:8,dailySales:3,leadTime:7,safetyStock:8,unitCost:120,supplier:'Tech Supply Co.'},
+    {name:'Bath Soap',sku:'CARE-006',category:'Personal Care',stock:95,dailySales:4,leadTime:3,safetyStock:10,unitCost:28,supplier:'Daily Essentials'},
+    {name:'Water Bottle',sku:'HOME-010',category:'Home',stock:11,dailySales:1.5,leadTime:6,safetyStock:5,unitCost:160,supplier:'Household Depot'},
+    {name:'Desk Pen Blue',sku:'NOTE-005',category:'Stationery',stock:130,dailySales:7,leadTime:3,safetyStock:15,unitCost:8,supplier:'ABC Paper Traders'}
+  ];
+  for(const s of samples){const existing=products.findIndex(p=>p.sku===s.sku);if(existing>=0)products[existing]={...products[existing],...s};else products.push({...s,id:'p_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)});}
+  save();showToast('Sample products loaded. Edit them or add your own products.');
+});
+$('search').addEventListener('input',render);$('filter').addEventListener('change',render);
+$('exportButton').addEventListener('click',()=>{
+  if(!products.length){alert('No products to export. Add products first.');return;}
+  const rows=[['Product','SKU','Category','Current Stock','Average Daily Sales','Lead Time Days','Safety Stock','Reorder Point','Estimated Days Left','Status','Suggested Order Units','Unit Cost INR','Supplier'],
+  ...products.map(p=>{const m=metrics(p);return [p.name,p.sku,p.category,p.stock,p.dailySales,p.leadTime,p.safetyStock,m.reorder,Number.isFinite(m.days)?m.days.toFixed(1):'N/A',m.risk?'Stockout risk':m.low?'Reorder soon':'Healthy',m.suggested,p.unitCost,p.supplier];})];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='inventory-stockout-report.csv';a.click();URL.revokeObjectURL(url);
+});
+$('resetDemoButton').addEventListener('click',()=>{
+  if(confirm('Remove all products saved in this browser? This cannot be undone.')){products=[];save();resetForm();showToast('Inventory cleared.');}
+});
+render();
+</script>
+</body>
+</html>
